@@ -44,26 +44,31 @@ app.get("/health", (req, res) => {
 // Right now we ONLY store the note locally
 app.post("/notes", async (req, res) => {
   const note = {
-    id: Date.now(),
-    text: req.body.text
-  };
+  id: req.body.id || Date.now(),
+  text: req.body.text,
+  sourceNode: req.body.sourceNode || NODE_NAME,
+  replicated: req.body.replicated || false
+};
   notes.push(note);
+
   let replicationStatus = "no peer configured";
-if (PEER_URL) {
+
+  //Only replicates if incoming note was not already replicated
+if (PEER_URL && !note.replicated) {
   try {
-    await axios.post(`${PEER_URL}/notes`, note);
+    await axios.post(`${PEER_URL}/notes`, {
+      ...note,
+      replicated: true,
+      sourceNode: NODE_NAME
+    });
+
     replicationStatus = `replicated to ${PEER_URL}`;
   } catch (error) {
     replicationStatus = `failed to replicate to ${PEER_URL}`;
   }
+} else if (note.replicated) {
+  replicationStatus = "received replicated note; not forwarding";
 }
-// Returns Node with fields, like a reciept
-  res.status(201).json({
-    message: "Note created",
-    node: NODE_NAME,
-    note: note,
-    replication: replicationStatus
-  });
 });
 
 
